@@ -63,17 +63,13 @@ process HITSELECTION {
         }
         return(result)
     }
-
-    
     # Optimized evaluate_edges function
     evaluate_edges <- function(degrees, total_edges, node_set, observed_edges) {
         # Subset the degrees to only include the nodes in the node_set
         degree_subset <- degrees[node_set]
-        
         # Calculate the expected edges (lambda) using vectorized operations
         pairwise_products <- outer(degree_subset, degree_subset, FUN = "*")
         lambda <- sum(pairwise_products[upper.tri(pairwise_products)]) / (2 * total_edges)
-        
         # Calculate log p-value for stability
         log_p_value <- -ppois(observed_edges - 1, lambda, lower.tail = FALSE, log.p = TRUE)
         
@@ -140,7 +136,6 @@ process HITSELECTION {
         }
     }
 
-
     # Apply the lookup_gene_info function to each row in the screen data
     info <- do.call(rbind, apply(screen, 1, function(row) lookup_gene_info(as.character(row[1]), as.character(row\$Gene_2))))
     info <- as.data.frame(info)
@@ -183,8 +178,6 @@ process HITSELECTION {
     degree <- degree(g)
     names(degree) <- V(g)\$name
     total_edges <- ecount(g)
-
-
     min <- 0
     max <- ${hit_selection_iteration_nb}
     steps <- max - min
