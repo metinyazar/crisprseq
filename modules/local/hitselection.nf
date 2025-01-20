@@ -30,7 +30,8 @@ process HITSELECTION {
     #!/usr/bin/env Rscript
     #### author: Metin Yazar
     #### Released under the MIT license. See git repository (https://github.com/nf-core/crisprseq) for full license text.
-    ####
+    #### This implementation originally made use of code from the implementation of RNAiCut on the Comprehensive Analysis of RNAi Data (CARD) resource (https://card.niaid.nih.gov/). We gratefully acknowledge the contribution of the authors of this work.
+    #### Reference : Dutta et al. (2016) Nat Commun. 7:10578. "An interactive web-based application for Comprehensive Analysis of RNAi-screen Data." [Pubmed: 26902267]
 
     library(igraph)
     library(dplyr)
@@ -63,72 +64,20 @@ process HITSELECTION {
         return(result)
     }
 
-    # Function to perform degree-conserved edge permutations
-    EdgePermutationDegreeConserved <- function(permutation, frequency, degree, hit.genes, graph) {
-        edges.permutation.degree.conserved <- rep(NA, permutation)  # Initialize result vector
-        if(length(hit.genes) > 0) {
-            for(j in 1:permutation) {
-                set.seed(j)  # Change the seed for each permutation
-                hit.genes.permuted.degree.conserved <- NULL
-                # Permute genes based on degree thresholds
-                if(sum(frequency[which(as.numeric(names(frequency)) > 500)]) > 0){
-                    sample.temp <- which(degree > 500)
-                    hit.genes.permuted.degree.conserved <- c(hit.genes.permuted.degree.conserved,
-                                                            names(sample(x = sample.temp, size = sum(frequency[which(as.numeric(names(frequency)) > 500)]), replace = FALSE)))
-                }
-                if(sum(frequency[which(as.numeric(names(frequency)) <= 500 & as.numeric(names(frequency)) > 100)]) > 0){
-                    sample.temp <- which(degree <= 500 & degree > 100)
-                    hit.genes.permuted.degree.conserved <- c(hit.genes.permuted.degree.conserved,
-                                                            names(sample(x = sample.temp, size = sum(frequency[which(as.numeric(names(frequency)) <= 500 & as.numeric(names(frequency)) > 100)]), replace = FALSE)))
-                }
-                if(sum(frequency[which(as.numeric(names(frequency)) <= 100 & as.numeric(names(frequency)) > 50)]) > 0){
-                    sample.temp <- which(degree <= 100 & degree > 50)
-                    hit.genes.permuted.degree.conserved <- c(hit.genes.permuted.degree.conserved,
-                                                            names(sample(x = sample.temp, size = sum(frequency[which(as.numeric(names(frequency)) <= 100 & as.numeric(names(frequency)) > 50)]), replace = FALSE)))
-                }
-                if(sum(frequency[which(as.numeric(names(frequency)) <= 50 & as.numeric(names(frequency)) > 30)]) > 0){
-                    sample.temp <- which(degree <= 50 & degree > 30)
-                    hit.genes.permuted.degree.conserved <- c(hit.genes.permuted.degree.conserved,
-                                                            names(sample(x = sample.temp, size = sum(frequency[which(as.numeric(names(frequency)) <= 50 & as.numeric(names(frequency)) > 30)]), replace = FALSE)))
-                }
-                if(sum(frequency[which(as.numeric(names(frequency)) <= 30 & as.numeric(names(frequency)) > 10)]) > 0){
-                    sample.temp <- which(degree <= 30 & degree > 10)
-                    hit.genes.permuted.degree.conserved <- c(hit.genes.permuted.degree.conserved,
-                                                            names(sample(x = sample.temp, size = sum(frequency[which(as.numeric(names(frequency)) <= 30 & as.numeric(names(frequency)) > 10)]), replace = FALSE)))
-                }
-                if(length(which(as.numeric(names(frequency)) <= 10)) > 0) {
-                    temp.frequency <- frequency[which(as.numeric(names(frequency)) <= 10)]
-                    for(k in 1:length(temp.frequency)){
-                        sample.temp <- which(degree == as.numeric(names(temp.frequency[k])))
-                        hit.genes.permuted.degree.conserved <- c(hit.genes.permuted.degree.conserved,
-                                                                names(sample(x = sample.temp, size = temp.frequency[k], replace = FALSE)))
-                    }
-                }
-                # Ensure the number of permuted genes matches the original hit genes
-                if(length(hit.genes) != length(hit.genes.permuted.degree.conserved)) {
-                    print("we have a problem")
-                }
-                # Count the number of edges in the permuted subgraph and store it
-                edges.permutation.degree.conserved[j] <- length(E(induced.subgraph(graph, hit.genes.permuted.degree.conserved)))
-            }
-        } else {
-            edges.permutation.degree.conserved[1:permutation] = 0  # If no hit genes, all edge counts are zero
-        }
-        return(edges.permutation.degree.conserved)
-    }
-
-    Find.Significance <- function(graph, hit.genes, degree, permutation)
-    {
-        subGraph <- induced.subgraph(graph, hit.genes)
-        edges <- length(E(subGraph))	# Compute number of edges in the network
-        frequency <- table(degree[which((names(degree) %in% hit.genes) == TRUE)])  # Find degrees in the original graph
-        edges.permutation.degree.conserved <- EdgePermutationDegreeConserved(permutation,frequency,degree,hit.genes,graph)
-        avg_edges_permutation_degree_conserved <- mean(edges.permutation.degree.conserved)
-        logp.val.degree.conserved = - ppois(edges-1, avg_edges_permutation_degree_conserved,lower.tail = FALSE,log.p = TRUE)
-        #logp.val.degree.conserved <-  -log10(p.val.degree.conserved)
-        no.nodes <- length(V(subGraph))
-        no.edges <- length(E(subGraph))
-        return(data.frame(logp.val.degree.conserved,edges,avg_edges_permutation_degree_conserved))
+    
+    # Optimized evaluate_edges function
+    evaluate_edges <- function(degrees, total_edges, node_set, observed_edges) {
+        # Subset the degrees to only include the nodes in the node_set
+        degree_subset <- degrees[node_set]
+        
+        # Calculate the expected edges (lambda) using vectorized operations
+        pairwise_products <- outer(degree_subset, degree_subset, FUN = "*")
+        lambda <- sum(pairwise_products[upper.tri(pairwise_products)]) / (2 * total_edges)
+        
+        # Calculate log p-value for stability
+        log_p_value <- -ppois(observed_edges - 1, lambda, lower.tail = FALSE, log.p = TRUE)
+        
+        return(list(expected_edges = lambda, log_p_value = log_p_value))
     }
 
     # Load necessary data
@@ -233,34 +182,39 @@ process HITSELECTION {
     # Calculate the degree (number of connections) for each gene in the graph
     degree <- degree(g)
     names(degree) <- V(g)\$name
+    total_edges <- ecount(g)
+
 
     min <- 0
     max <- ${hit_selection_iteration_nb}
     steps <- max - min
     hit.genes.last <- NULL
     final_results <- list() # Initialize as an empty list
-    for(i in 1:steps) {
-        final_hit.genes <- intersect(screen_genes[c(1:i)], V(g)\$name)
-        hit.genes.last <- final_hit.genes
-        result <- Find.Significance(g, hit.genes.last, degree, permutation = 500)
-        final_results[[i]]  <- result
+    # Iterative edge evaluation
+    for (i in 1:steps) {
+        current_genes <- intersect(screen_genes[1:i], vertex_attr(g, "name"))
+        observed_edges <- sum(ends(g, E(g))[, 1] %in% current_genes & ends(g, E(g))[, 2] %in% current_genes)
+        
+        result <- evaluate_edges(degree, total_edges, current_genes, observed_edges)
+        final_results[[i]] <- c(result, Rank = i) # Add Rank column only once
     }
 
     final_dataframe <- bind_rows(final_results)
     final_dataframe\$gene_symbols <- gene_symbols_1000
     write.table(final_dataframe, file=paste0(filename,"_hitselection.tsv"),row.names=FALSE,quote=FALSE,sep="\t")
 
-    max_value <- max(final_dataframe\$logp.val.degree.conserved)
-    max_index <- which.max(final_dataframe\$logp.val.degree.conserved)
+    max_value <- max(final_dataframe\$log_p_value)
+    max_index <- which.max(final_dataframe\$log_p_value)
 
     # Add a column to the dataframe to indicate whether each point is the maximum or not
     final_dataframe <- final_dataframe %>%
-    mutate(is_max = ifelse(logp.val.degree.conserved == max_value, "Maximum", "Other"))
+    mutate(is_max = ifelse(log_p_value == max_value, "Maximum", "Other"))
 
     # Create the plot
 
-    ggplot(final_dataframe, aes(x = seq_along(logp.val.degree.conserved), y = logp.val.degree.conserved)) +
+    ggplot(final_dataframe, aes(x = seq_along(log_p_value), y = log_p_value)) +
         geom_point(aes(color = is_max, size = is_max)) +
+        geom_line(aes(group = 1), color = "blue", size = 0.8) +  # Adds a line connecting the points
         scale_color_manual(values = c("Maximum" = "red", "Other" = "black")) +
         scale_size_manual(values = c("Maximum" = 3, "Other" = 1)) +  # Adjust sizes as needed
         labs(title = "Log P-value (Degree Conserved) vs Index",
