@@ -31,7 +31,6 @@ process HITSELECTION {
     #### author: Metin Yazar
     #### Released under the MIT license. See git repository (https://github.com/nf-core/crisprseq) for full license text.
     #### This implementation originally made use of code from the implementation of RNAiCut on the Comprehensive Analysis of RNAi Data (CARD) resource (https://card.niaid.nih.gov/).We gratefully acknowledge the contribution of the authors of this work. Reference : Dutta et al. (2016) Nat Commun. 7:10578."An interactive web-based application for Comprehensive Analysis of RNAi-screen Data."[Pubmed: 26902267]
-    
     library(igraph)
     library(dplyr)
     library(ggplot2)
