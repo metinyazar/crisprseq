@@ -30,9 +30,8 @@ process HITSELECTION {
     #!/usr/bin/env Rscript
     #### author: Metin Yazar
     #### Released under the MIT license. See git repository (https://github.com/nf-core/crisprseq) for full license text.
-    #### This implementation originally made use of code from the implementation of RNAiCut on the Comprehensive Analysis of RNAi Data (CARD) resource (https://card.niaid.nih.gov/). We gratefully acknowledge the contribution of the authors of this work.
-    #### Reference : Dutta et al. (2016) Nat Commun. 7:10578. "An interactive web-based application for Comprehensive Analysis of RNAi-screen Data." [Pubmed: 26902267]
-
+    #### This implementation originally made use of code from the implementation of RNAiCut on the Comprehensive Analysis of RNAi Data (CARD) resource (https://card.niaid.nih.gov/).We gratefully acknowledge the contribution of the authors of this work. Reference : Dutta et al. (2016) Nat Commun. 7:10578."An interactive web-based application for Comprehensive Analysis of RNAi-screen Data."[Pubmed: 26902267]
+    
     library(igraph)
     library(dplyr)
     library(ggplot2)
@@ -72,7 +71,6 @@ process HITSELECTION {
         lambda <- sum(pairwise_products[upper.tri(pairwise_products)]) / (2 * total_edges)
         # Calculate log p-value for stability
         log_p_value <- -ppois(observed_edges - 1, lambda, lower.tail = FALSE, log.p = TRUE)
-        
         return(list(expected_edges = lambda, log_p_value = log_p_value))
     }
 
@@ -187,7 +185,6 @@ process HITSELECTION {
     for (i in 1:steps) {
         current_genes <- intersect(screen_genes[1:i], vertex_attr(g, "name"))
         observed_edges <- sum(ends(g, E(g))[, 1] %in% current_genes & ends(g, E(g))[, 2] %in% current_genes)
-        
         result <- evaluate_edges(degree, total_edges, current_genes, observed_edges)
         final_results[[i]] <- c(result, Rank = i) # Add Rank column only once
     }
