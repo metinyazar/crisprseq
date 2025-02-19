@@ -602,10 +602,11 @@ workflow CRISPRSEQ_TARGETED {
         BOWTIE2_ALIGN (
             ch_preprocess_reads,
             BOWTIE2_BUILD.out.index,
+            ch_oriented_reference,
             false,
             true
         )
-        ch_mapped_bam = BOWTIE2_ALIGN.out.aligned
+        ch_mapped_bam = BOWTIE2_ALIGN.out.bam
         ch_versions = ch_versions.mix(BOWTIE2_ALIGN.out.versions)
     }
 
