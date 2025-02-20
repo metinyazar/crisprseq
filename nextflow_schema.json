@@ -254,7 +254,7 @@
                 "drugz_remove_genes": {
                     "type": "string",
                     "description": "Essential genes to remove from the drugZ modules",
-                    "pattern": "\\\\S+"
+                    "pattern": "[^\\s]+"
                 },
                 "hitselection": {
                     "type": "boolean",
